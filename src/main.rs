@@ -41,9 +41,7 @@ impl GoalEntity {
 }
 
 
-pub struct add_goal_use_case {
-    goal_entity: GoalEntity,
-}
+pub struct add_goal_use_case;
 
 impl  add_goal_use_case {
     pub fn execute(goal_entity: GoalEntity, repo: &mut dyn Repository) -> Result<(), String>{
@@ -73,10 +71,9 @@ impl GoalSqliteRepository {
         match stmt.execute([]) {
             Ok(_) => Ok(()),
             Err(e) => Err(e.to_string()),
-        };
-        Ok(())
-    }
+        }
 
+    }
 }
 
 impl Repository for GoalSqliteRepository {
@@ -135,33 +132,65 @@ impl controller {
     }
 
     pub fn add_goal(&mut self, goal: GoalEntity) -> Result<(), String> {
-        self.use_case = add_goal_use_case {
-            goal_entity: goal,
-        };
-        match add_goal_use_case::execute(self.use_case.goal_entity.clone(), &mut self.repo) {
+        match add_goal_use_case::execute(goal, &mut self.repo) {
             Ok(_) => Ok(()),
             Err(e) => Err(e),
         }
     }
 }
 
+pub struct CliPresentation {
+    controller: controller,
+}
+
+impl CliPresentation {
+    pub fn new(controller: controller) -> CliPresentation {
+        CliPresentation {
+            controller: controller,
+        }
+    }
+
+
+    pub fn run(&mut self) -> Result<(), String>{
+        println!("do tou want to add a goal?");
+        let mut selection = String::new();
+        std::io::stdin().read_line(&mut selection).unwrap();
+        let yes_selection: String =  "y".to_string();
+        match selection {
+             yes_selection => {
+                println!("what is the name of the goal?");
+                let mut  name = String::new();
+                std::io::stdin().read_line(&mut name).unwrap();
+                println!("what is the description of the goal?");
+                let mut description = String::new();
+                std::io::stdin().read_line(&mut description).unwrap();
+                println!("what is the finish date of the goal?");
+                let mut finish_date = String::new();
+                std::io::stdin().read_line(&mut finish_date).unwrap();
+                
+                let goal = GoalEntity::new(name, description, finish_date, [].to_vec());
+            
+                self.controller.init_repo();
+                self.controller.create_table();
+                self.controller.add_goal(goal);
+            
+                Ok(())                
+        },
+        _ => Ok(())
+    }
+}
+}
+
 
 //This is the main function that will be called when the program is run
 fn main() {
-    let mut controller = controller {
-        repo: GoalSqliteRepository::new(rusqlite::Connection::open_in_memory().unwrap()),
-        use_case: add_goal_use_case {
-            goal_entity: GoalEntity::new(
-                "Test Goal".to_string(),
-                "This is a test goal".to_string(),
-                "2024-01-01".to_string(),
-                vec!["test".to_string()],
-            ),
-        },
+    let controller = controller {
+        repo: GoalSqliteRepository {
+            db: rusqlite::Connection::open("goals.db").unwrap(),
+        }, 
+        use_case: add_goal_use_case 
     };
-    controller.init_repo();
-    controller.create_table();
-
-    controller.add_goal(controller.use_case.goal_entity.clone());
+    let mut presentation = CliPresentation::new(controller);
+    presentation.run();
 
 }
